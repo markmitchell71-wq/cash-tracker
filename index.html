@@ -28,7 +28,7 @@ h1{font-size:28px;margin:0} h2{font-size:20px;margin:0 0 14px} h3{font-size:15px
 .btn.primary{background:var(--accent);color:#07111e;border-color:transparent;font-weight:800}
 .btn.danger{border-color:#6e3338;color:#ffb1b1;background:#32191d}
 .btn.small{padding:6px 9px;font-size:12px}
-.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(5,minmax(150px,1fr));margin-bottom:18px}
+.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(6,minmax(145px,1fr));margin-bottom:18px}
 .card{background:rgba(17,26,46,.95);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
 .kpi-label{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .kpi-value{font-size:25px;font-weight:850;margin-top:7px}
@@ -67,6 +67,7 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
 .muted{color:var(--muted)}
 .right{text-align:right}
 .empty{padding:30px 10px;color:var(--muted);text-align:center}
+.hero{border-color:#3e79a9;background:linear-gradient(135deg,rgba(25,55,88,.98),rgba(17,26,46,.98))}.hero .kpi-value{font-size:34px}.minirow{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(38,53,84,.72)}.sectiontitle{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:8px 0}.preview-ok{color:var(--good)}.preview-ignore{color:var(--muted)}
 @media(max-width:1050px){.shell{grid-template-columns:1fr}.sidebar{height:auto;position:static;border-right:0;border-bottom:1px solid var(--line);display:flex;gap:4px;overflow:auto;padding:10px}.brand{display:none}.navbtn{width:auto;white-space:nowrap}.main{padding:18px}.kpis{grid-template-columns:repeat(2,1fr)}.two,.three{grid-template-columns:1fr}}
 @media(max-width:650px){.kpis{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr 1fr}.topbar{align-items:flex-start;flex-direction:column}.hide-sm{display:none}}
 </style>
@@ -87,15 +88,16 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
     <section id="dashboard" class="section active">
       <div class="topbar">
         <div><h1>Budget Dashboard</h1><div class="sub">Cash on hand, bills paid, bills remaining, and what is truly left this pay cycle.</div></div>
-        <div class="actions"><button class="btn" onclick="openTxnImport()">Import Monarch CSV</button><button class="btn primary" onclick="openBalanceModal()">Update balances</button></div>
+        <div class="actions"><button class="btn" onclick="exportBackup()">Quick backup</button><button class="btn" onclick="openMatchReview()">Review matches <span id="reviewCount"></span></button><button class="btn" onclick="openTxnImport()">Import Monarch CSV</button><button class="btn primary" onclick="openBalanceModal()">Update balances</button></div>
       </div>
       <div id="cycleChips" class="cyclechips"></div>
       <div class="grid kpis">
-        <div class="card"><div class="kpi-label">Cash on hand</div><div id="kCash" class="kpi-value">$0</div><div class="kpi-foot">Across included cash accounts</div></div>
-        <div class="card"><div class="kpi-label">Cycle bills</div><div id="kBills" class="kpi-value">$0</div><div class="kpi-foot">Planned for this pay cycle</div></div>
-        <div class="card"><div class="kpi-label">Already paid</div><div id="kPaid" class="kpi-value good">$0</div><div class="kpi-foot">Manual + transaction matches</div></div>
-        <div class="card clickable" onclick="openLeftToPay()" role="button" tabindex="0"><div class="kpi-label">Left to be paid</div><div id="kLeft" class="kpi-value warn">$0</div><div id="kLeftFoot" class="kpi-foot">Tap to see what is still due</div></div>
-        <div class="card"><div class="kpi-label">Cash after unpaid bills</div><div id="kDiff" class="kpi-value">$0</div><div class="kpi-foot">Cash on hand minus remaining bills</div></div>
+        <div class="card hero"><div class="kpi-label">Safe to spend</div><div id="kFree" class="kpi-value">$0</div><div class="kpi-foot">After due + pending bills + cash cushion</div></div>
+        <div class="card"><div class="kpi-label">Cash on hand</div><div id="kCash" class="kpi-value">$0</div><div id="kCashFoot" class="kpi-foot">Across included cash accounts</div></div>
+        <div class="card"><div class="kpi-label">Already paid</div><div id="kPaid" class="kpi-value good">$0</div><div class="kpi-foot">Posted/manual payments</div></div>
+        <div class="card"><div class="kpi-label">Pending / committed</div><div id="kPending" class="kpi-value">$0</div><div class="kpi-foot">Charged but not posted</div></div>
+        <div class="card clickable" onclick="openLeftToPay()" role="button" tabindex="0"><div class="kpi-label">Still due</div><div id="kLeft" class="kpi-value warn">$0</div><div id="kLeftFoot" class="kpi-foot">Tap to see what is left</div></div>
+        <div class="card"><div class="kpi-label">Next paycheck</div><div id="kNextPay" class="kpi-value">—</div><div id="kNextPayFoot" class="kpi-foot">Upcoming pay date</div></div>
       </div>
       <div class="grid two">
         <div class="card">
@@ -105,7 +107,7 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
           <div style="overflow:auto;margin-top:10px"><table><thead><tr><th>Bill</th><th>Due</th><th class="money">Amount</th><th>Status</th><th></th></tr></thead><tbody id="dashBills"></tbody></table></div>
         </div>
         <div class="card">
-          <h2>Cash accounts</h2><div id="accountCards"></div>
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:start"><h2>Cash accounts</h2><span id="balanceAsOf" class="muted" style="font-size:11px"></span></div><div id="accountCards"></div>
           <div class="note" style="margin-top:13px">Your workbook’s “Total On Hand” logic is preserved here: account balances are summed first, then remaining unpaid bills are subtracted to show the amount that is actually free.</div>
         </div>
       </div>
@@ -113,7 +115,7 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
 
     <section id="cycles" class="section">
       <div class="topbar"><div><h1>Pay Cycles</h1><div class="sub">Biweekly pay dates with planned, paid, and remaining obligations.</div></div><button class="btn primary" onclick="openCycleModal()">Add pay cycle</button></div>
-      <div class="card" style="overflow:auto"><table><thead><tr><th>Pay date</th><th class="money">Paycheck</th><th class="money">Planned bills</th><th class="money">Paid</th><th class="money">Left</th><th class="money">Cash after left</th><th></th></tr></thead><tbody id="cyclesBody"></tbody></table></div>
+      <div class="card" style="overflow:auto"><table><thead><tr><th>Pay date</th><th class="money">Paycheck</th><th class="money">Planned bills</th><th class="money">Paid</th><th class="money">Still due</th><th class="money">Safe to spend</th><th></th></tr></thead><tbody id="cyclesBody"></tbody></table></div>
     </section>
 
     <section id="bills" class="section">
@@ -135,7 +137,7 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
     <section id="history" class="section">
       <div class="topbar"><div><h1>Monthly History</h1><div class="sub">Use a full Monarch history export to build month-by-month spending visibility.</div></div><button class="btn primary" onclick="openTxnImport()">Import history CSV</button></div>
       <div class="grid two">
-        <div class="card"><h2>Monthly spending</h2><div id="monthlyBars"></div></div>
+        <div class="card"><h2>Monthly spending</h2><div id="monthlyBars"></div></div><div class="card"><h2>Cash after obligations trend</h2><div class="sub">Snapshot recorded whenever you update balances.</div><div id="cashTrend" style="margin-top:12px"></div></div>
         <div class="card"><h2>Top categories</h2><div id="categoryBars"></div></div>
       </div>
     </section>
@@ -148,11 +150,12 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
             <div><label>Default paycheck</label><input id="setPaycheck" class="input moneyin" type="number" step=".01"></div>
             <div><label>Match tolerance ($)</label><input id="setTolerance" class="input moneyin" type="number" step=".01"></div>
             <div><label>Date window (days)</label><input id="setDateWindow" class="input" type="number"></div>
+            <div><label>Cash cushion</label><input id="setCushion" class="input moneyin" type="number" step=".01" min="0"></div>
             <div style="align-self:end"><button class="btn primary" onclick="saveSettings()">Save settings</button></div>
           </div>
           <div class="note" style="margin-top:14px">Seeded from your Budget2026 workbook: biweekly pay cycles and a default paycheck of $3,750.48. Both are editable.</div>
         </div>
-        <div class="card"><h2>Backup / restore</h2><div class="actions"><button class="btn" onclick="exportBackup()">Export JSON backup</button><label class="btn" for="restoreFile">Restore backup</label><input id="restoreFile" type="file" accept=".json" class="fileinput" onchange="restoreBackup(event)"><button class="btn danger" onclick="resetData()">Reset app</button></div><div class="note" style="margin-top:14px">For privacy, this file does not send your financial data anywhere. Browser storage is local to the device/browser where you open it.</div></div>
+        <div class="card"><h2>Backup / restore</h2><div class="actions"><button class="btn" onclick="exportBackup()">Export JSON backup</button><label class="btn" for="restoreFile">Restore backup</label><input id="restoreFile" type="file" accept=".json" class="fileinput" onchange="restoreBackup(event)"><button class="btn" onclick="restorePreImportBackup()">Undo last import</button><button class="btn danger" onclick="resetData()">Reset app</button></div><div class="note" style="margin-top:14px">For privacy, this file does not send your financial data anywhere. Browser storage is local to the device/browser where you open it.</div></div>
       </div>
     </section>
   </main>
@@ -160,9 +163,11 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
 
 <div id="balanceModal" class="modalback"><div class="modal"><div class="modalhead"><h2>Update account balances</h2><button class="btn small" onclick="closeModal('balanceModal')">Close</button></div>
 <div class="drop" style="margin-bottom:16px"><strong>Upload cash-account balances CSV</strong><div class="sub">Or edit the balances manually below. Only existing Checking and Savings accounts are updated. Credit cards, investments, loans, 401(k)s, and other accounts are ignored.</div><label class="btn" for="balanceFile" style="display:inline-block;margin-top:12px">Choose balances CSV</label><input id="balanceFile" class="fileinput" type="file" accept=".csv,text/csv" onchange="importBalances(event)"></div>
-<div id="balanceFields" class="formgrid"></div><div class="actions" style="margin-top:16px"><button class="btn primary" onclick="saveBalances()">Save manual balances</button></div></div></div>
+<div id="balancePreview" style="display:none;margin-bottom:14px"></div><div id="balanceFields" class="formgrid"></div><div class="actions" style="margin-top:16px"><button id="applyBalanceImportBtn" class="btn primary" style="display:none" onclick="applyBalanceImport()">Apply imported balances</button><button class="btn primary" onclick="saveBalances()">Save manual balances</button></div></div></div>
 
 <div id="leftToPayModal" class="modalback"><div class="modal"><div class="modalhead"><div><h2>Left to pay</h2><div id="leftToPaySummary" class="sub"></div></div><button class="btn small" onclick="closeModal('leftToPayModal')">Close</button></div><div style="overflow:auto"><table><thead><tr><th>Bill</th><th>Due</th><th class="money">Amount</th><th>Status</th></tr></thead><tbody id="leftToPayBody"></tbody></table></div></div></div>
+
+<div id="matchReviewModal" class="modalback"><div class="modal"><div class="modalhead"><div><h2>Review transaction matches</h2><div class="sub">Possible matches that were not strong enough to apply automatically.</div></div><button class="btn small" onclick="closeModal('matchReviewModal')">Close</button></div><div id="matchReviewBody"></div></div></div>
 
 <div id="billModal" class="modalback"><div class="modal"><div class="modalhead"><h2 id="billModalTitle">Add bill</h2><button class="btn small" onclick="closeModal('billModal')">Close</button></div>
 <input id="billEditId" type="hidden"><div class="formgrid">
@@ -229,11 +234,11 @@ function initial(){
       {id:uid(),institution:'Chase',name:'Checking',type:'Checking',balance:0,include:true}
     ],
     bills, cycles:seedCycles(), assignments:[], transactions:[],
-    settings:{defaultPaycheck:3750.48,tolerance:3,dateWindow:7}, selectedCycle:null
+    settings:{defaultPaycheck:3750.48,tolerance:3,dateWindow:7,cushion:500}, balanceUpdatedAt:null, balanceHistory:[], matchReviews:[], selectedCycle:null
   };
 }
 let state=load();
-function load(){try{let x=JSON.parse(localStorage.getItem(KEY));if(x){x.accounts=x.accounts||[];x.transactions=x.transactions||[];x.assignments=x.assignments||[];x.settings=x.settings||{};x.settings.defaultPaycheck=Number(x.settings.defaultPaycheck||3750.48);x.settings.tolerance=Number(x.settings.tolerance??3);x.settings.dateWindow=Number(x.settings.dateWindow??7);x.assignments.forEach(a=>{if(!a.paymentStatus)a.paymentStatus=a.paid?'paid':'unpaid'});return x}}catch(e){}return initial()}
+function load(){try{let x=JSON.parse(localStorage.getItem(KEY));if(x){x.accounts=x.accounts||[];x.transactions=x.transactions||[];x.assignments=x.assignments||[];x.settings=x.settings||{};x.settings.defaultPaycheck=Number(x.settings.defaultPaycheck||3750.48);x.settings.tolerance=Number(x.settings.tolerance??3);x.settings.dateWindow=Number(x.settings.dateWindow??7);x.settings.cushion=Number(x.settings.cushion??500);x.balanceUpdatedAt=x.balanceUpdatedAt||null;x.balanceHistory=x.balanceHistory||[];x.matchReviews=x.matchReviews||[];x.assignments.forEach(a=>{if(!a.paymentStatus)a.paymentStatus=a.paid?'paid':'unpaid'});return x}}catch(e){}return initial()}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function ensureAssignments(){
   for(const c of state.cycles){
@@ -270,7 +275,7 @@ function cycleStats(c){
   const pending=as.filter(a=>(a.paymentStatus||'unpaid')==='pending').reduce((s,a)=>s+Number(a.amount||0),0);
   const left=as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='unpaid').reduce((s,a)=>s+Number(a.amount||0),0);
   const cash=state.accounts.filter(a=>a.include).reduce((s,a)=>s+Number(a.balance||0),0);
-  return {as,planned,paid,pending,left,cash,diff:cash-left};
+  const cushion=Number(state.settings.cushion||0);const committed=pending+left;const free=cash-committed-cushion;return {as,planned,paid,pending,left,cash,cushion,committed,free,diff:cash-left};
 }
 function showTab(id){
   document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
@@ -282,11 +287,10 @@ function renderAll(){ensureAssignments();renderDashboard();renderCycles();render
 function renderDashboard(){
   let c=currentCycle();if(!c)return;
   let s=cycleStats(c);
-  $('kCash').textContent=money(s.cash);$('kBills').textContent=money(s.planned);$('kPaid').textContent=money(s.paid);$('kLeft').textContent=money(s.left);$('kDiff').textContent=money(s.diff);
-  $('kDiff').className='kpi-value '+(s.diff<0?'bad':'good');
+  $('kFree').textContent=money(s.free);$('kFree').className='kpi-value '+(s.free<0?'bad':'good');$('kCash').textContent=money(s.cash);$('kPaid').textContent=money(s.paid);$('kPending').textContent=money(s.pending);$('kLeft').textContent=money(s.left);if($('reviewCount'))$('reviewCount').textContent=state.matchReviews.length?`(${state.matchReviews.length})`:'';let upcoming=state.cycles.slice().sort((a,b)=>a.date.localeCompare(b.date)).find(x=>x.date>today());if(upcoming){let days=Math.max(0,Math.ceil((new Date(upcoming.date+'T12:00:00')-new Date(today()+'T12:00:00'))/86400000));$('kNextPay').textContent=days===0?'Today':`${days} day${days===1?'':'s'}`;$('kNextPayFoot').textContent=`${fmtDate(upcoming.date)} • ${money(upcoming.paycheck)}`}else{$('kNextPay').textContent='—';$('kNextPayFoot').textContent='No future pay cycle'};if($('kCashFoot'))$('kCashFoot').textContent=state.balanceUpdatedAt?`Updated ${new Date(state.balanceUpdatedAt).toLocaleString()}`:'Balances not updated yet';if($('balanceAsOf'))$('balanceAsOf').textContent=state.balanceUpdatedAt?`As of ${new Date(state.balanceUpdatedAt).toLocaleString()}`:'No update timestamp';
   $('paidProgress').style.width=(s.planned?Math.min(100,s.paid/s.planned*100):0)+'%';
-  $('cycleSummary').textContent=`Pay date ${fmtDate(c.date)} • ${money(c.paycheck)} paycheck • ${s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='paid').length} paid • ${s.as.filter(a=>(a.paymentStatus||'unpaid')==='pending').length} pending • ${s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='unpaid').length} left`;
-  if($('kLeftFoot')) $('kLeftFoot').textContent=s.pending?`${money(s.pending)} pending/committed • tap for details`:'Tap to see what is still due';
+  $('cycleSummary').textContent=`Pay date ${fmtDate(c.date)} • ${money(c.paycheck)} paycheck • ${s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='paid').length} paid • ${s.as.filter(a=>(a.paymentStatus||'unpaid')==='pending').length} pending • ${s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='unpaid').length} still due • ${money(s.cushion)} cushion`;
+  if($('kLeftFoot')) $('kLeftFoot').textContent=`${s.as.filter(a=>(a.paymentStatus||'unpaid')==='unpaid').length} bill${s.as.filter(a=>(a.paymentStatus||'unpaid')==='unpaid').length===1?'':'s'} still due • tap for details`;
   const chips=state.cycles.slice().sort((a,b)=>a.date.localeCompare(b.date)).filter(x=>Math.abs((new Date(x.date)-new Date(c.date))/86400000)<100);
   $('cycleChips').innerHTML=chips.map(x=>`<button class="chip ${x.id===c.id?'active':''}" onclick="selectCycle('${x.id}')">${fmtDate(x.date).replace(', 2026','')}</button>`).join('');
   $('dashBills').innerHTML=s.as.length?s.as.map(a=>{
@@ -301,7 +305,7 @@ function selectCycle(id){state.selectedCycle=id;save();renderAll()}
 function togglePaid(id){let a=state.assignments.find(x=>x.id===id);if(!a)return;let st=a.paymentStatus|| (a.paid?'paid':'unpaid');if(st==='paid'){a.paid=false;a.paymentStatus='unpaid';a.manual=false}else{a.paid=true;a.paymentStatus='paid';a.manual=true}a.matchedTxnId=null;save();renderAll()}
 function renderCycles(){
   const cash=state.accounts.filter(a=>a.include).reduce((s,a)=>s+Number(a.balance||0),0);
-  $('cyclesBody').innerHTML=state.cycles.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(c=>{let s=cycleStats(c);return `<tr><td><button class="btn small" onclick="selectCycle('${c.id}');showTab('dashboard')">${fmtDate(c.date)}</button></td><td class="money">${money(c.paycheck)}</td><td class="money">${money(s.planned)}</td><td class="money good">${money(s.paid)}</td><td class="money warn">${money(s.left)}</td><td class="money ${cash-s.left<0?'bad':'good'}">${money(cash-s.left)}</td><td class="right"><button class="btn small danger" onclick="deleteCycle('${c.id}')">Delete</button></td></tr>`}).join('');
+  $('cyclesBody').innerHTML=state.cycles.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(c=>{let s=cycleStats(c);return `<tr><td><button class="btn small" onclick="selectCycle('${c.id}');showTab('dashboard')">${fmtDate(c.date)}</button></td><td class="money">${money(c.paycheck)}</td><td class="money">${money(s.planned)}</td><td class="money good">${money(s.paid)}</td><td class="money warn">${money(s.left)}</td><td class="money ${cash-s.committed-(state.settings.cushion||0)<0?'bad':'good'}">${money(cash-s.committed-(state.settings.cushion||0))}</td><td class="right"><button class="btn small danger" onclick="deleteCycle('${c.id}')">Delete</button></td></tr>`}).join('');
 }
 function renderBills(){
   $('billsBody').innerHTML=state.bills.map(b=>`<tr><td><strong>${esc(b.name)}</strong></td><td>${esc(b.due)}</td><td class="money">${money(b.amount)}</td><td>${b.recurring?'Yes':'No'}</td><td class="muted">${esc(b.aliases||'')}</td><td class="right"><button class="btn small" onclick="editBill('${b.id}')">Edit</button> <button class="btn small danger" onclick="deleteBill('${b.id}')">Delete</button></td></tr>`).join('');
@@ -320,30 +324,31 @@ function renderTransactions(){
 function renderHistory(){
   let spend={};state.transactions.forEach(t=>{let a=Number(t.amount||0);if(a<0)spend[monthKey(t.date)]=(spend[monthKey(t.date)]||0)+Math.abs(a)});
   let months=Object.entries(spend).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12), max=Math.max(1,...months.map(x=>x[1]));
-  $('monthlyBars').innerHTML=months.length?months.map(([k,v])=>`<div class="barrow"><span>${new Date(k+'-01T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'})}</span><div class="bar"><span style="width:${v/max*100}%"></span></div><strong class="right">${money(v)}</strong></div>`).join(''):`<div class="empty">Import Monarch history to see monthly spending.</div>`;
+  $('monthlyBars').innerHTML=months.length?months.map(([k,v])=>`<div class="barrow"><span>${new Date(k+'-01T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'})}</span><div class="bar"><span style="width:${v/max*100}%"></span></div><strong class="right">${money(v)}</strong></div>`).join(''):`<div class="empty">Import Monarch history to see monthly spending.</div>`;if($('cashTrend')){let hist=(state.balanceHistory||[]).slice(-12);$('cashTrend').innerHTML=hist.length?hist.map(h=>`<div class="minirow"><span>${new Date(h.at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span><span>Cash ${money(h.cash)}</span><strong class="${h.free<0?'bad':'good'}">${money(h.free)} safe</strong></div>`).join(''):`<div class="empty">Update balances to begin the trend.</div>`;}
   let cats={};state.transactions.forEach(t=>{let a=Number(t.amount||0);if(a<0)cats[t.category||'Uncategorized']=(cats[t.category||'Uncategorized']||0)+Math.abs(a)});
   let top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,10), cmax=Math.max(1,...top.map(x=>x[1]));
   $('categoryBars').innerHTML=top.length?top.map(([k,v])=>`<div class="barrow"><span>${esc(k)}</span><div class="bar"><span style="width:${v/cmax*100}%"></span></div><strong class="right">${money(v)}</strong></div>`).join(''):`<div class="empty">No category history yet.</div>`;
 }
-function renderSettings(){if(!$('setPaycheck'))return;$('setPaycheck').value=state.settings.defaultPaycheck;$('setTolerance').value=state.settings.tolerance;$('setDateWindow').value=state.settings.dateWindow}
+function renderSettings(){if(!$('setPaycheck'))return;$('setPaycheck').value=state.settings.defaultPaycheck;$('setTolerance').value=state.settings.tolerance;$('setDateWindow').value=state.settings.dateWindow;$('setCushion').value=state.settings.cushion||0}
 function isCashAccount(a){let t=normText(a?.type||'');return t==='checking'||t==='savings'||t.includes('checking')||t.includes('savings')}
 function looksNonCash(name,type){let x=normText(`${name||''} ${type||''}`);return /credit|card|brokerage|investment|401k|401 k|ira|roth|stock|equity|loan|mortgage|retirement|hsa|crypto/.test(x)}
 function cleanupNonCashAccounts(){state.accounts=state.accounts.filter(a=>isCashAccount(a)&&!looksNonCash(a.name,a.type))}
-function openBalanceModal(){$('balanceFields').innerHTML=state.accounts.filter(isCashAccount).map(a=>`<div><label>${esc(a.institution)} — ${esc(a.name)}</label><input class="input moneyin" type="number" step=".01" data-balance="${a.id}" value="${Number(a.balance||0).toFixed(2)}"></div>`).join('');openModal('balanceModal')}
-function saveBalances(){document.querySelectorAll('[data-balance]').forEach(i=>{let a=state.accounts.find(x=>x.id===i.dataset.balance);if(a)a.balance=Number(i.value||0)});save();closeModal('balanceModal');renderAll()}
+function openBalanceModal(){if($('balancePreview')){$('balancePreview').style.display='none';$('balancePreview').innerHTML=''}if($('applyBalanceImportBtn'))$('applyBalanceImportBtn').style.display='none';pendingBalanceImport=[];$('balanceFields').innerHTML=state.accounts.filter(isCashAccount).map(a=>`<div><label>${esc(a.institution)} — ${esc(a.name)}</label><input class="input moneyin" type="number" step=".01" data-balance="${a.id}" value="${Number(a.balance||0).toFixed(2)}"></div>`).join('');openModal('balanceModal')}
+function recordBalanceSnapshot(){state.balanceUpdatedAt=new Date().toISOString();let c=currentCycle();if(c){let st=cycleStats(c);state.balanceHistory=state.balanceHistory||[];state.balanceHistory.push({at:state.balanceUpdatedAt,cash:st.cash,free:st.free,cycleId:c.id});state.balanceHistory=state.balanceHistory.slice(-60)}}function saveBalances(){document.querySelectorAll('[data-balance]').forEach(i=>{let a=state.accounts.find(x=>x.id===i.dataset.balance);if(a)a.balance=Number(i.value||0)});recordBalanceSnapshot();save();closeModal('balanceModal');renderAll()}
 function normText(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'')}
+let pendingBalanceImport=[];
 function importBalances(ev){
-  let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No balance rows found.');let heads=rows[0],updated=0,ignored=0;
-    cleanupNonCashAccounts();
-    for(let r of rows.slice(1)){let o={};heads.forEach((h,i)=>o[h]=r[i]||'');let institution=pick(o,['Institution','Bank','Financial Institution'])||'';let name=pick(o,['Account Name','Account','Name'])||'';let type=pick(o,['Type','Account Type'])||'';let raw=pick(o,['Available Balance','Current Balance','Balance']);if(raw==='')continue;
-      if(looksNonCash(name,type)){ignored++;continue}
-      let balance=parseAmount(raw);let acct=state.accounts.find(a=>{if(!isCashAccount(a))return false;let an=normText(a.name), ai=normText(a.institution), n=normText(name), ins=normText(institution);return (n&&an===n&&(!ins||!ai||ai===ins)) || (n&&(`${ai}${an}`.includes(n)||n.includes(`${ai}${an}`)))});
-      if(acct){acct.balance=balance;updated++}else{ignored++}
+  let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No rows found.');let heads=rows[0],preview=[];pendingBalanceImport=[];cleanupNonCashAccounts();
+    for(let r of rows.slice(1)){let o={};heads.forEach((h,i)=>o[h]=r[i]||'');let institution=pick(o,['Institution','Bank','Financial Institution'])||'';let name=pick(o,['Account Name','Account','Name'])||'';let type=pick(o,['Type','Account Type'])||'';let raw=pick(o,['Available Balance','Current Balance','Balance']);if(raw==='')continue;let balance=parseAmount(raw);
+      if(looksNonCash(name,type)){preview.push({name:`${institution} ${name}`.trim(),balance,action:'Ignored — non-cash'});continue}
+      let acct=state.accounts.find(a=>{if(!isCashAccount(a))return false;let an=normText(a.name),ai=normText(a.institution),n=normText(name),ins=normText(institution);return (n&&an===n&&(!ins||!ai||ai===ins))||(n&&(`${ai}${an}`.includes(n)||n.includes(`${ai}${an}`)))});
+      if(acct){pendingBalanceImport.push({accountId:acct.id,balance});preview.push({name:`${acct.institution} — ${acct.name}`,balance,action:'Will update'})}else preview.push({name:`${institution} ${name}`.trim(),balance,action:'Ignored — unmatched'});
     }
-    save();ev.target.value='';openBalanceModal();renderAll();alert(`Cash balances imported: ${updated} updated. ${ignored} non-cash or unmatched account${ignored===1?'':'s'} ignored.`)
+    $('balancePreview').style.display='block';$('balancePreview').innerHTML=`<div class="sectiontitle">Import preview</div>`+preview.map(x=>`<div class="minirow"><span>${esc(x.name||'Unnamed account')}</span><strong>${money(x.balance)}</strong><span class="${x.action==='Will update'?'preview-ok':'preview-ignore'}">${esc(x.action)}</span></div>`).join('');$('applyBalanceImportBtn').style.display=pendingBalanceImport.length?'inline-block':'none';ev.target.value='';
   };rd.readAsText(f)
 }
-function openLeftToPay(){let c=currentCycle();if(!c)return;let s=cycleStats(c),left=s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))!=='paid');$('leftToPaySummary').textContent=`${money(s.left)} still unpaid • ${money(s.pending)} pending/committed`;$('leftToPayBody').innerHTML=left.length?left.sort((a,b)=>{let ba=state.bills.find(x=>x.id===a.billId),bb=state.bills.find(x=>x.id===b.billId);return Number(ba?.due||99)-Number(bb?.due||99)}).map(a=>{let b=state.bills.find(x=>x.id===a.billId)||{name:'Deleted bill',due:''};let st=a.paymentStatus||'unpaid';return `<tr><td><strong>${esc(b.name)}</strong></td><td>${esc(b.due)}</td><td class="money">${money(a.amount)}</td><td>${st==='pending'?'<span class="pill pending">Pending / committed</span>':'<span class="pill unpaid">Still due</span>'}</td></tr>`}).join(''):`<tr><td colspan="4" class="empty">Nothing left to pay in this cycle.</td></tr>`;openModal('leftToPayModal')}
+function applyBalanceImport(){pendingBalanceImport.forEach(x=>{let a=state.accounts.find(a=>a.id===x.accountId);if(a)a.balance=x.balance});recordBalanceSnapshot();save();let count=pendingBalanceImport.length;pendingBalanceImport=[];$('balancePreview').style.display='none';$('applyBalanceImportBtn').style.display='none';openBalanceModal();renderAll();alert(`${count} cash account balance${count===1?'':'s'} updated.`)}
+function openLeftToPay(){let c=currentCycle();if(!c)return;let s=cycleStats(c),pending=s.as.filter(a=>(a.paymentStatus||'unpaid')==='pending'),due=s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))==='unpaid');$('leftToPaySummary').textContent=`${money(s.left)} still due • ${money(s.pending)} pending/committed • ${money(s.free)} safe to spend`;let row=a=>{let b=state.bills.find(x=>x.id===a.billId)||{name:'Deleted bill',due:''};let st=a.paymentStatus||'unpaid';return `<tr><td><strong>${esc(b.name)}</strong></td><td>${esc(b.due)}</td><td class="money">${money(a.amount)}</td><td>${st==='pending'?'<span class="pill pending">Pending / committed</span>':'<span class="pill unpaid">Still due</span>'}</td></tr>`};let html='';if(pending.length)html+=`<tr><td colspan="4" class="sectiontitle">Pending / committed</td></tr>`+pending.map(row).join('');if(due.length)html+=`<tr><td colspan="4" class="sectiontitle">Still to pay</td></tr>`+due.map(row).join('');$('leftToPayBody').innerHTML=html||`<tr><td colspan="4" class="empty">Nothing left to pay in this cycle.</td></tr>`;openModal('leftToPayModal')}
 
 function openBillModal(){$('billModalTitle').textContent='Add bill';$('billEditId').value='';$('billName').value='';$('billDue').value='';$('billAmount').value='';$('billRecurring').value='true';$('billAliases').value='';openModal('billModal')}
 function editBill(id){let b=state.bills.find(x=>x.id===id);if(!b)return;$('billModalTitle').textContent='Edit bill';$('billEditId').value=id;$('billName').value=b.name;$('billDue').value=b.due;$('billAmount').value=b.amount;$('billRecurring').value=String(b.recurring);$('billAliases').value=b.aliases||'';openModal('billModal')}
@@ -356,7 +361,7 @@ function deleteAccount(id){if(confirm('Delete this account?')){state.accounts=st
 function openCycleModal(){$('cycleDate').value=addDays(state.cycles.slice().sort((a,b)=>a.date.localeCompare(b.date)).at(-1)?.date||today(),14);$('cyclePaycheck').value=state.settings.defaultPaycheck;openModal('cycleModal')}
 function saveCycle(){let d=$('cycleDate').value;if(!d)return;state.cycles.push({id:uid(),date:d,paycheck:Number($('cyclePaycheck').value||0)});state.cycles.sort((a,b)=>a.date.localeCompare(b.date));save();closeModal('cycleModal');ensureAssignments();renderAll()}
 function deleteCycle(id){if(!confirm('Delete this pay cycle?'))return;state.cycles=state.cycles.filter(x=>x.id!==id);state.assignments=state.assignments.filter(x=>x.cycleId!==id);if(state.selectedCycle===id)state.selectedCycle=null;save();renderAll()}
-function saveSettings(){state.settings.defaultPaycheck=Number($('setPaycheck').value||0);state.settings.tolerance=Number($('setTolerance').value||0);state.settings.dateWindow=Number($('setDateWindow').value||7);save();renderAll()}
+function saveSettings(){state.settings.defaultPaycheck=Number($('setPaycheck').value||0);state.settings.tolerance=Number($('setTolerance').value||0);state.settings.dateWindow=Number($('setDateWindow').value||7);state.settings.cushion=Math.max(0,Number($('setCushion').value||0));save();renderAll()}
 function openTxnImport(){openModal('txnImportModal')}
 function csvParse(text){
   let rows=[],row=[],field='',q=false;
@@ -367,7 +372,7 @@ function normalizeHeader(s){return String(s||'').trim().toLowerCase().replace(/[
 function pick(obj,names){for(let n of names){let k=Object.keys(obj).find(k=>normalizeHeader(k)===normalizeHeader(n));if(k&&obj[k]!==undefined)return obj[k]}return ''}
 function parseAmount(v){let s=String(v||'').replace(/[$,()]/g,'').trim();let n=Number(s);if(String(v).includes('(')&&String(v).includes(')'))n=-Math.abs(n);return Number.isFinite(n)?n:0}
 function importTransactions(ev){
-  let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No rows found.');
+  let f=ev.target.files[0];if(!f)return;try{localStorage.setItem(KEY+'_preImportBackup',JSON.stringify(state))}catch(e){}let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No rows found.');
     let heads=rows[0],existing=new Set(state.transactions.map(t=>t.hash)),added=0;
     for(let r of rows.slice(1)){let o={};heads.forEach((h,i)=>o[h]=r[i]||'');let date=pick(o,['Date','Transaction Date','Posted Date']);if(!date)continue;let d=new Date(date);if(isNaN(d))continue;let ds=d.toISOString().slice(0,10);
       let merchant=pick(o,['Merchant','Original Statement','Description','Name'])||'Unknown';
@@ -378,27 +383,18 @@ function importTransactions(ev){
   };rd.readAsText(f);
 }
 function runMatching(){
-  const tol=Number(state.settings.tolerance||3), win=Number(state.settings.dateWindow||7);
-  let assignments=state.assignments.filter(a=>!a.manual);
-  for(let a of assignments){a.paid=false;a.paymentStatus='unpaid';a.matchedTxnId=null}
-  for(let a of assignments){
-    let b=state.bills.find(x=>x.id===a.billId), c=state.cycles.find(x=>x.id===a.cycleId);if(!b||!c)continue;
-    let aliases=[b.name,...String(b.aliases||'').split(',')].map(x=>x.trim().toLowerCase()).filter(Boolean);
-    let next=nextCycle(c.date), start=addDays(c.date,-win), end=addDays(next?next.date:addDays(c.date,14),win);
-    let candidates=state.transactions.filter(t=>t.date>=start&&t.date<=end&&!state.assignments.some(x=>x.matchedTxnId===t.id));
-    let best=null,bestScore=-1;
-    for(let t of candidates){
-      let m=t.merchant.toLowerCase(), nameHit=aliases.some(x=>m.includes(x)||x.includes(m)), amt=Math.abs(Number(t.amount||0)), diff=Math.abs(amt-Number(a.amount||0));
-      let amountHit=diff<=Math.max(tol,Math.abs(a.amount||0)*.035);
-      let score=(nameHit?3:0)+(amountHit?3:0)+(t.amount<0?1:0);
-      if(score>bestScore&&score>=5){best=t;bestScore=score}
-    }
-    if(best){a.paymentStatus=best.status==='pending'?'pending':'paid';a.paid=a.paymentStatus==='paid';a.matchedTxnId=best.id}
-  }
-  save();renderAll();
+  const tol=Number(state.settings.tolerance||3), win=Number(state.settings.dateWindow||7);state.matchReviews=[];
+  let assignments=state.assignments.filter(a=>!a.manual);for(let a of assignments){a.paid=false;a.paymentStatus='unpaid';a.matchedTxnId=null}
+  for(let a of assignments){let b=state.bills.find(x=>x.id===a.billId),c=state.cycles.find(x=>x.id===a.cycleId);if(!b||!c)continue;let aliases=[b.name,...String(b.aliases||'').split(',')].map(x=>x.trim().toLowerCase()).filter(Boolean);let next=nextCycle(c.date),start=addDays(c.date,-win),end=addDays(next?next.date:addDays(c.date,14),win);let candidates=state.transactions.filter(t=>t.date>=start&&t.date<=end&&!state.assignments.some(x=>x.matchedTxnId===t.id));let scored=[];
+    for(let t of candidates){let m=t.merchant.toLowerCase(),nameHit=aliases.some(x=>m.includes(x)||x.includes(m)),amt=Math.abs(Number(t.amount||0)),diff=Math.abs(amt-Number(a.amount||0)),amountHit=diff<=Math.max(tol,Math.abs(a.amount||0)*.035),score=(nameHit?3:0)+(amountHit?3:0)+(t.amount<0?1:0);if(score>=3)scored.push({t,score,nameHit,amountHit,diff})}
+    scored.sort((x,y)=>y.score-x.score||x.diff-y.diff);let best=scored[0];if(best&&best.score>=6){a.paymentStatus=best.t.status==='pending'?'pending':'paid';a.paid=a.paymentStatus==='paid';a.matchedTxnId=best.t.id}else if(best&&best.score>=3){state.matchReviews.push({id:uid(),assignmentId:a.id,transactionId:best.t.id,score:best.score})}
+  }save();renderAll();
 }
+function openMatchReview(){let reviews=state.matchReviews||[];$('matchReviewBody').innerHTML=reviews.length?reviews.map(r=>{let a=state.assignments.find(x=>x.id===r.assignmentId),b=a&&state.bills.find(x=>x.id===a.billId),t=state.transactions.find(x=>x.id===r.transactionId);if(!a||!b||!t)return '';return `<div class="card" style="margin-bottom:10px"><div class="minirow"><div><strong>${esc(b.name)}</strong><div class="muted">Bill ${money(a.amount)} • due ${esc(b.due)}</div></div><div class="right"><strong>${esc(t.merchant)}</strong><div class="muted">${fmtDate(t.date)} • ${money(Math.abs(t.amount))}${t.status==='pending'?' • pending':''}</div></div></div><div class="actions" style="margin-top:10px"><button class="btn primary small" onclick="approveMatch('${r.id}')">Match</button><button class="btn small" onclick="dismissMatch('${r.id}')">Not a match</button></div></div>`}).join(''):`<div class="empty">No uncertain matches to review.</div>`;openModal('matchReviewModal')}
+function approveMatch(id){let r=state.matchReviews.find(x=>x.id===id);if(!r)return;let a=state.assignments.find(x=>x.id===r.assignmentId),t=state.transactions.find(x=>x.id===r.transactionId);if(a&&t){a.paymentStatus=t.status==='pending'?'pending':'paid';a.paid=a.paymentStatus==='paid';a.matchedTxnId=t.id;a.manual=true}state.matchReviews=state.matchReviews.filter(x=>x.id!==id);save();openMatchReview();renderAll()}
+function dismissMatch(id){state.matchReviews=state.matchReviews.filter(x=>x.id!==id);save();openMatchReview();renderAll()}
 function exportBackup(){let blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='budget-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
-function restoreBackup(ev){let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{try{state=JSON.parse(rd.result);save();renderAll();alert('Backup restored.')}catch(e){alert('Could not read that backup.')}};rd.readAsText(f)}
+function restoreBackup(ev){let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{try{state=JSON.parse(rd.result);save();renderAll();alert('Backup restored.')}catch(e){alert('Could not read that backup.')}};rd.readAsText(f)}function restorePreImportBackup(){try{let raw=localStorage.getItem(KEY+'_preImportBackup');if(!raw)return alert('No pre-import backup is available.');if(!confirm('Undo the most recent transaction import and restore the data from just before it?'))return;state=JSON.parse(raw);save();renderAll();alert('Last import undone.')}catch(e){alert('Could not restore the pre-import backup.')}}
 function resetData(){if(confirm('Reset all app data to the original seeded budget?')){localStorage.removeItem(KEY);state=initial();save();renderAll()}}
 function openModal(id){$(id).classList.add('open')}function closeModal(id){$(id).classList.remove('open')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
