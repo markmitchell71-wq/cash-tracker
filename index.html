@@ -159,7 +159,7 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin:0 0
 </div>
 
 <div id="balanceModal" class="modalback"><div class="modal"><div class="modalhead"><h2>Update account balances</h2><button class="btn small" onclick="closeModal('balanceModal')">Close</button></div>
-<div class="drop" style="margin-bottom:16px"><strong>Upload balances CSV</strong><div class="sub">Or edit the balances manually below. The importer recognizes common columns such as Institution, Account, Account Name, Type, Balance, Current Balance, and Available Balance.</div><label class="btn" for="balanceFile" style="display:inline-block;margin-top:12px">Choose balances CSV</label><input id="balanceFile" class="fileinput" type="file" accept=".csv,text/csv" onchange="importBalances(event)"></div>
+<div class="drop" style="margin-bottom:16px"><strong>Upload cash-account balances CSV</strong><div class="sub">Or edit the balances manually below. Only existing Checking and Savings accounts are updated. Credit cards, investments, loans, 401(k)s, and other accounts are ignored.</div><label class="btn" for="balanceFile" style="display:inline-block;margin-top:12px">Choose balances CSV</label><input id="balanceFile" class="fileinput" type="file" accept=".csv,text/csv" onchange="importBalances(event)"></div>
 <div id="balanceFields" class="formgrid"></div><div class="actions" style="margin-top:16px"><button class="btn primary" onclick="saveBalances()">Save manual balances</button></div></div></div>
 
 <div id="leftToPayModal" class="modalback"><div class="modal"><div class="modalhead"><div><h2>Left to pay</h2><div id="leftToPaySummary" class="sub"></div></div><button class="btn small" onclick="closeModal('leftToPayModal')">Close</button></div><div style="overflow:auto"><table><thead><tr><th>Bill</th><th>Due</th><th class="money">Amount</th><th>Status</th></tr></thead><tbody id="leftToPayBody"></tbody></table></div></div></div>
@@ -326,15 +326,21 @@ function renderHistory(){
   $('categoryBars').innerHTML=top.length?top.map(([k,v])=>`<div class="barrow"><span>${esc(k)}</span><div class="bar"><span style="width:${v/cmax*100}%"></span></div><strong class="right">${money(v)}</strong></div>`).join(''):`<div class="empty">No category history yet.</div>`;
 }
 function renderSettings(){if(!$('setPaycheck'))return;$('setPaycheck').value=state.settings.defaultPaycheck;$('setTolerance').value=state.settings.tolerance;$('setDateWindow').value=state.settings.dateWindow}
-function openBalanceModal(){$('balanceFields').innerHTML=state.accounts.map(a=>`<div><label>${esc(a.institution)} — ${esc(a.name)}</label><input class="input moneyin" type="number" step=".01" data-balance="${a.id}" value="${Number(a.balance||0).toFixed(2)}"></div>`).join('');openModal('balanceModal')}
+function isCashAccount(a){let t=normText(a?.type||'');return t==='checking'||t==='savings'||t.includes('checking')||t.includes('savings')}
+function looksNonCash(name,type){let x=normText(`${name||''} ${type||''}`);return /credit|card|brokerage|investment|401k|401 k|ira|roth|stock|equity|loan|mortgage|retirement|hsa|crypto/.test(x)}
+function cleanupNonCashAccounts(){state.accounts=state.accounts.filter(a=>isCashAccount(a)&&!looksNonCash(a.name,a.type))}
+function openBalanceModal(){$('balanceFields').innerHTML=state.accounts.filter(isCashAccount).map(a=>`<div><label>${esc(a.institution)} — ${esc(a.name)}</label><input class="input moneyin" type="number" step=".01" data-balance="${a.id}" value="${Number(a.balance||0).toFixed(2)}"></div>`).join('');openModal('balanceModal')}
 function saveBalances(){document.querySelectorAll('[data-balance]').forEach(i=>{let a=state.accounts.find(x=>x.id===i.dataset.balance);if(a)a.balance=Number(i.value||0)});save();closeModal('balanceModal');renderAll()}
 function normText(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'')}
 function importBalances(ev){
-  let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No balance rows found.');let heads=rows[0],updated=0,added=0;
-    for(let r of rows.slice(1)){let o={};heads.forEach((h,i)=>o[h]=r[i]||'');let institution=pick(o,['Institution','Bank','Financial Institution'])||'';let name=pick(o,['Account Name','Account','Name'])||'';let type=pick(o,['Type','Account Type'])||'Checking';let raw=pick(o,['Available Balance','Current Balance','Balance']);if(raw==='')continue;let balance=parseAmount(raw);let acct=state.accounts.find(a=>{let an=normText(a.name), ai=normText(a.institution), n=normText(name), ins=normText(institution);return (n&&an===n&&( !ins||!ai||ai===ins)) || (n&&(`${ai}${an}`.includes(n)||n.includes(`${ai}${an}`)))});
-      if(acct){acct.balance=balance;updated++}else if(name){state.accounts.push({id:uid(),institution:institution||'Imported',name,type,balance,include:true});added++}
+  let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{let rows=csvParse(rd.result);if(rows.length<2)return alert('No balance rows found.');let heads=rows[0],updated=0,ignored=0;
+    cleanupNonCashAccounts();
+    for(let r of rows.slice(1)){let o={};heads.forEach((h,i)=>o[h]=r[i]||'');let institution=pick(o,['Institution','Bank','Financial Institution'])||'';let name=pick(o,['Account Name','Account','Name'])||'';let type=pick(o,['Type','Account Type'])||'';let raw=pick(o,['Available Balance','Current Balance','Balance']);if(raw==='')continue;
+      if(looksNonCash(name,type)){ignored++;continue}
+      let balance=parseAmount(raw);let acct=state.accounts.find(a=>{if(!isCashAccount(a))return false;let an=normText(a.name), ai=normText(a.institution), n=normText(name), ins=normText(institution);return (n&&an===n&&(!ins||!ai||ai===ins)) || (n&&(`${ai}${an}`.includes(n)||n.includes(`${ai}${an}`)))});
+      if(acct){acct.balance=balance;updated++}else{ignored++}
     }
-    save();ev.target.value='';openBalanceModal();renderAll();alert(`Balances imported: ${updated} updated${added?`, ${added} account${added===1?'':'s'} added`:''}.`)
+    save();ev.target.value='';openBalanceModal();renderAll();alert(`Cash balances imported: ${updated} updated. ${ignored} non-cash or unmatched account${ignored===1?'':'s'} ignored.`)
   };rd.readAsText(f)
 }
 function openLeftToPay(){let c=currentCycle();if(!c)return;let s=cycleStats(c),left=s.as.filter(a=>(a.paymentStatus|| (a.paid?'paid':'unpaid'))!=='paid');$('leftToPaySummary').textContent=`${money(s.left)} still unpaid • ${money(s.pending)} pending/committed`;$('leftToPayBody').innerHTML=left.length?left.sort((a,b)=>{let ba=state.bills.find(x=>x.id===a.billId),bb=state.bills.find(x=>x.id===b.billId);return Number(ba?.due||99)-Number(bb?.due||99)}).map(a=>{let b=state.bills.find(x=>x.id===a.billId)||{name:'Deleted bill',due:''};let st=a.paymentStatus||'unpaid';return `<tr><td><strong>${esc(b.name)}</strong></td><td>${esc(b.due)}</td><td class="money">${money(a.amount)}</td><td>${st==='pending'?'<span class="pill pending">Pending / committed</span>':'<span class="pill unpaid">Still due</span>'}</td></tr>`}).join(''):`<tr><td colspan="4" class="empty">Nothing left to pay in this cycle.</td></tr>`;openModal('leftToPayModal')}
@@ -397,7 +403,7 @@ function resetData(){if(confirm('Reset all app data to the original seeded budge
 function openModal(id){$(id).classList.add('open')}function closeModal(id){$(id).classList.remove('open')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 window.addEventListener('click',e=>{if(e.target.classList.contains('modalback'))e.target.classList.remove('open')});
-ensureAssignments();renderAll();
+cleanupNonCashAccounts();save();ensureAssignments();renderAll();
 </script>
 </body>
 </html>
